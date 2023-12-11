@@ -13,6 +13,8 @@ class Packet {
 
     static uint16_t calculate_checksum(std::vector<uint8_t>& class_data);
 
+    virtual ~Packet(){};
+
    protected:
     virtual uint8_t get_message_id() = 0;
     virtual uint8_t get_subclass_id() = 0;
@@ -27,6 +29,8 @@ class Packet {
 class AckPacket : public Packet {
    public:
     void bytes(std::vector<uint8_t>& bytes) override;
+
+    ~AckPacket();
 
    protected:
     uint8_t get_message_id() override;
@@ -44,6 +48,8 @@ class ThrustSetPacket : public Packet {
     ThrustSetPacket(uint8_t thruster_id, float speed);
 
     void bytes(std::vector<uint8_t>& bytes) override;
+
+    ~ThrustSetPacket();
 
    protected:
     uint8_t get_message_id() override;

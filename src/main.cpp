@@ -1,6 +1,8 @@
+#include <cstring>
 #include <iostream>
 #include "interface.h"
 #include "packet.h"
+#include "packet_factory.h"
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
@@ -44,4 +46,73 @@ TEST_CASE("Test ThrustSetPacket") {
     show(correct);
 
     CHECK(bytes == correct);
+}
+
+TEST_CASE("Test Send ThrustSetPacket") {
+    float thrust = 1.0;
+    uint8_t id = 0;
+
+    PacketFactory factory;
+
+    Packet* thrustPacket = factory.createThrustSetPacket(id, thrust);
+    Packet* ack = factory.createAckPacket();
+
+    class TestSerial : public SerialInterface {
+       public:
+        TestSerial(Packet* packet, Packet* ack) {
+            this->packet = packet;
+            this->ack = ack;
+        }
+
+        void write(const unsigned char* s, std::size_t size) override {
+            std::vector<uint8_t> data(s, s + size);
+            std::vector<uint8_t> bytes;
+            packet->bytes(bytes);
+            CHECK(data == bytes);
+        }
+
+        void read(const unsigned char* s, std::size_t bytes) override {
+            std::vector<uint8_t> data;
+            ack->bytes(data);
+            std::memcpy((void*)s, data.data(), bytes);
+        }
+
+        uint16_t bytes_available() override {
+            std::vector<uint8_t> data;
+            ack->bytes(data);
+            return data.size();
+        }
+
+       private:
+        Packet* packet;
+        Packet* ack;
+    };
+
+    class TestCAN : public CANInterface {
+       public:
+        void on_data(Packet& data) override {
+            received_count++;
+            std::vector<uint8_t> bytes;
+            data.bytes(bytes);
+            if (received_count == 1) {
+                CHECK(bytes[2] == 0);
+                CHECK(bytes[3] == 1);
+            } else {
+                REQUIRE(false);
+            }
+        }
+
+       private:
+        int received_count = 0;
+    };
+
+    TestCAN can;
+    TestSerial serial(thrustPacket, ack);
+
+    USBToCANDriver driver(serial, can);
+    driver.send_packet(*thrustPacket);
+    driver.read_packet();
+
+    delete ack;
+    delete thrustPacket;
 }

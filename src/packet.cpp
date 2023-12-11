@@ -33,6 +33,8 @@ void AckPacket::bytes(std::vector<uint8_t>& bytes) {
     serialize(bytes, class_data);
 }
 
+AckPacket::~AckPacket() {}
+
 uint8_t AckPacket::get_message_id() {
     return MESSAGE_ID;
 }
@@ -60,6 +62,8 @@ void ThrustSetPacket::bytes(std::vector<uint8_t>& bytes) {
     class_data.insert(class_data.end(), speed_bytes, speed_bytes + 4);
     serialize(bytes, class_data);
 }
+
+ThrustSetPacket::~ThrustSetPacket() {}
 
 uint8_t ThrustSetPacket::get_message_id() {
     return MESSAGE_ID;
