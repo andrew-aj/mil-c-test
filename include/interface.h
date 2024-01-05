@@ -5,34 +5,18 @@
 #include <cstdint>
 #include <vector>
 
-#include "packet.h"
-
-class SerialInterface {
+class SerialDriverInterface {
    public:
-    virtual void write(const unsigned char* s, std::size_t size) = 0;
+    virtual void send(const unsigned char* s, std::size_t size) = 0;
 
-    virtual void read(const unsigned char* buffer, std::size_t bytes) = 0;
+    virtual void receive(const unsigned char* buffer, std::size_t bytes) = 0;
 
     virtual uint16_t bytes_available() = 0;
 };
 
-class CANInterface {
+class SerialDriverFactory {
    public:
-    virtual void on_data(Packet& data) = 0;
-};
-
-class USBToCANDriver {
-   public:
-    USBToCANDriver(SerialInterface& stream, CANInterface& interface);
-
-    void read_packet();
-
-    void send_packet(Packet& packet);
-
-   private:
-    SerialInterface& stream;
-
-    CANInterface& interface;
+    static SerialDriverInterface* createSerialDriver() { return nullptr; }
 };
 
 #endif  // INTERFACE_H_
