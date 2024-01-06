@@ -5,11 +5,13 @@
 #include <cstdint>
 #include <vector>
 
+using std::uint8_t;
+
 class SerialDriverInterface {
    public:
-    virtual void send(const unsigned char* s, std::size_t size) = 0;
+    virtual void send(std::vector<uint8_t>& buffer) = 0;
 
-    virtual void receive(const unsigned char* buffer, std::size_t bytes) = 0;
+    virtual void receive(std::vector<uint8_t>& buffer) = 0;
 
     virtual uint16_t bytes_available() = 0;
 };

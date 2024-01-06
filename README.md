@@ -5,6 +5,29 @@
 # Spring 2024 Software Team Application
 ##################################################
 
+Welcome to the Spring 2024 Software Team Application! We are excited that you are
+interested in joining the team. This application is designed to test your ability
+to implement a simple serial driver that processes incoming packets and delivers
+return response packets according to the packet received.
+
+Please don't be frightened by the complexity of the exercise. It is 100% okay
+if you are unable to fully complete it, and we expect many members will not be able
+to do so. We are simply looking for a good faith effort and a demonstration of
+your ability to learn and implement new concepts.
+
+We hope that you enjoy this exercise. We are here to support you throughout your
+application and your time in the laboratory! We hope that you are excited to work
+at the Machine Intelligence Laboratory, and we look forward to reviewing your
+application.
+
+If you have any questions, please feel free to contact the MIL software leaders
+through the laboratory Discord, or email:
+
+- cbrown14@ufl.edu
+- andrew.knee@ufl.edu
+
+~ Andrew Knee and Cameron Brown
+
 
 
 ##################################################
@@ -21,7 +44,7 @@ include a requirements.txt file or a list of dependencies in your README.
 
 You will be assessed on the following criteria:
 - Correctness of implementation
-- Code quality
+- Code quality (readability, efficiency, modularity, etc.)
 - Documentation (only simple documentation needed)
 - Testing
 
@@ -30,85 +53,131 @@ the more complete your solution, the better your chances of being accepted. Each
 solution will be hollistically reviewed by a member of the Software Team.
 
 ##################################################
-# Serial Driver Outline
+# Packet Format
 ##################################################
+
+The packet format is the following:
++-------------+--------------+-------------------------------------------------------+
+| Item        | Size (bytes) | Description                                           |
++-------------+--------------+-------------------------------------------------------+
+| Start Bits  | 2            | The start bits for every packet. Always 0x4744.       |
+| Identifier  | 1            | The identifier of the packet.                         |
+| Payload     | Variable     | The payload of the packet, varying based on the       |
+|             |              | identifier received.                                  |
+| Checksum    | 1            | The BSD checksum of the packet.                       |
++-------------+--------------+-------------------------------------------------------+
 
 Each packet will begin with a 1 byte identifier. This identifier will be used to
 determine the layout of the rest of the packet and how to handle the packet.
 
 | Identifier | Message            |
 |------------|--------------------|
-| 0x00       | Kill               |
-| 0x01       | Unkill             |
+| 0x00       | ACK                |
+| 0x01       | NACK               |
 | 0x02       | Get Kill Status    |
 | 0x03       | Return Kill Status |
 | 0x04       | Heart Beat         |
-| 0x05       | ACK                |
-| 0x06       | Set Thrust         |
-| 0x07       | ACK Thrust         |
+| 0x05       | Kill               |
+| 0x06       | Unkill             |
+| 0x07       | Set Thrust         |
 
 At the end of every packet is a 1 byte checksum of all the data in the packet
-to verify packet integrity. It is calculated as just the XOR operation applied
-to every byte in the packet.
+to verify packet integrity. It is calculated by taking the BSD checksum of the
+entire packet minus the checksum byte. You will need to implement the BSD checksum
+in the language of your choice. Keep the length of the checksum to just one byte,
+ie, if your calculated checksum is more than one byte, take the least significant
+byte. The formula found on the algorithm's Wikipedia page is sufficient, just remember
+to limit your checksum to one byte (8 bits).
 
-After the packet identifier, the contents of the packet become specific to the 
-message type sent. Below is a chart
+After the packet identifier, the contents of the packet become specific to the
+message type sent.
 
-## Kill, Unkill, Get Kill Status, Heart Beat, and ACK
+| Identifier | Payload Size | Payload |
+|------------|--------------|---------|
+| 0x00       | 0            | None    |
+| 0x01       | 0            | None    |
+| 0x02       | 0            | None    |
+| 0x03       | 1            | 0x00 if kill is disabled, 0x01 if kill is enabled |
+| 0x04       | 0            | None    |
+| 0x05       | 0            | None    |
+| 0x06       | 0            | None    |
+| 0x07       | 5            | 1 byte thruster ID, 4 bytes float thrust value in little endian |
 
-No bytes following identifier besides the checksum at the end. An example packet
-would be:
+##################################################
+# Expected Behavior
+##################################################
 
-Kill:
-Byte 0: 0x00
-Byte 1: 0x00
+## ACK and NACK
 
-Unkill:
-Byte 0: 0x01
-Byte 1: 0x01
+ACK and NACK packets are general acknowledged and not acknowledged packets. They
+are sent back to the sender of the packet to indicate that the packet was received
+and processed. The ACK packet is sent back if the packet was processed successfully
+and the NACK packet is sent back if the packet was not processed successfully (ie,
+an error occurred, the checksum was invalid, etc.).
 
-Get Kill Status:
-Byte 0: 0x02
-Byte 1: 0x02
+Your driver is not expected to send ACK or NACK packets. If these packets are sent
+to your driver, it should return a NACK packet to indicate that the request was not
+acknowledged.
 
-Heart Beat:
-Byte 0: 0x04
-Byte 1: 0x04
+## Kill System
 
-ACK:
-Byte 0: 0x05
-Byte 1: 0x05
+Your driver will be able to set and unset the kill of your device. The kill system
+is used for safety, and temporarily disables all functioning on the device.
 
-## Return Kill Status
+Sending a KILL packet will result in the device being killed. Your driver should store
+this as some sort of state value that it will hold onto. An ACK packet will be
+returned if the kill is not currently set, and a NACK packet will be returned if the
+kill is already set. Likewise, sending an UNKILL packet will result in the device
+being un-killed. An ACK packet will be returned if the kill is currently set, and a
+NACK packet will be returned if the kill is not currently set.
 
-One byte following the identifier. The byte is 0x00 if kill is enabled and 0x01 if kill
-is disabled. Example packets would be:
+Sending a GET KILL STATUS packet will return the current kill status of the device
+in the form of a RETURN KILL STATUS packet. If the kill is not currently set, the
+RETURN KILL STATUS packet will have a payload of 0x00. If the kill is currently
+set, the RETURN KILL STATUS packet will have a payload of 0x01.
 
-Kill is disabled:
-Byte 0: 0x03
-Byte 1: 0x01
-Byte 2: 0x02
+If any thrusters are currently active, they should be disabled when the kill is set (ie,
+set to 0). Upon unkill, the thrusters should be set back to their previous values.
 
-Kill is enabled:
-Byte 0: 0x03
-Byte 1: 0x00
-Byte 2: 0x03
+## Thrust
 
-## Set Thrust
+Your driver will be able to set the thrust of the thrusters on your device. The
+thrust is a float value between 0 and 1 that represents the percentage of the
+maximum thrust that the thruster should be set to. The thrusters are identified
+by an ID from 0 to 7.
 
-One byte of the ID of the thruster to set the values of and then 4 bytes of the 
-float thrust value in little endian form. The thrust IDs are 0-7.
+Sending a SET THRUST packet will set the thrust of the thruster with the given ID
+to the given thrust value. An ACK packet will be returned if the thruster ID is
+valid and the thrust value is valid. A NACK packet will be returned if the thruster
+ID is invalid or the thrust value is invalid.
 
-## ACK Thrust
+If the kill is currently set, the thruster should not be set to the given value,
+but the ACK packet should still be returned.
 
-Exact same format as the Set Thrust message but with the ACK Thrust identifier.
+## Heartbeat
 
-## Packet order
+You must send a HEARTBEAT packet at least every 1 second to your device in order
+for it to remain unkilled. If a HEARTBEAT packet is not sent at least every 1
+second, the device immediately becomes killed. HEARTBEAT packets are not acknowledged.
 
-If Kill or Unkill is sent to the serial driver, it sends back the packet as an ACK.
+## Incomplete Packets
 
-If Get Kill Status packet is sent, return a Return Kill Status packet.
+The packet format is designed to be robust to incomplete packets. If a packet is
+received that is not complete, the packet should be discarded and no response
+should be sent. You know the length and expected format of each packet, if something
+is invalid, you should discard the packet and not send a response.
 
-If a Heart Beat packet is sent, return an ACK packet.
+##################################################
+# Implementation and Testing
+##################################################
 
-If a Set Thrust packet is sent, return an ACK Thrust packet.
+You will be provided small starter scripts in both Python and C++ for you to work
+with. Your application will not be preferred in any way for using either language.
+The provided code is purposefully minimal so you have the freedom to implement
+your solution however you want. However, please keep the basic interfaces we have
+provided for you in either language so testing your solution is easier. Though your
+solution will not just be graded for its correctness, it is an important factor.
+
+You will be provided with a simple simulator that will send packets to your driver
+and receive packets from your driver. You can use this simulator to test your
+driver. The simulator will be provided in both Python and C++.
